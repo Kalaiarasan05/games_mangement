@@ -383,7 +383,7 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;color:var(--text);backgro
     <div id="od-warn" style="font-size:11px;color:var(--danger);margin-bottom:12px;font-family:'DM Mono',monospace;display:none;">⚠ This will clear the current bracket.</div>
     <div class="modal-btns">
       <button class="btn" onclick="closeOv('ov-draw')">Cancel</button>
-      <button class="btn btn-gold" onclick="confirmDraw()">Draw Now 🎲</button>
+      <button class="btn btn-gold" onclick="confirmDraw()">Set Fixtures ✓</button>
     </div>
   </div>
 </div>
@@ -497,7 +497,7 @@ function renderPanel(){
       <div style="background:var(--s2);border:1px solid var(--border);border-radius:9px;padding:16px;margin-bottom:14px;font-size:13px;color:var(--muted2);line-height:1.6;">
         ${n===0?'No teams yet. Add teams from the left sidebar first.':n===1?'Need at least 2 teams to start.':`<span style="color:${col};font-weight:600;">${n} teams</span> registered. Ready to draw fixtures randomly.${n%2===1?'<br><span style="color:var(--gold);">Odd number — 1 team gets a bye.</span>':''}`}
       </div>
-      <button class="btn btn-gold" style="width:100%;justify-content:center;padding:12px;" ${ok?'':'disabled'} onclick="showDraw('${g}')">🎲 Draw Fixtures &amp; Start Tournament</button>
+      <button class="btn btn-gold" style="width:100%;justify-content:center;padding:12px;" ${ok?'':'disabled'} onclick="showDraw('${g}')">→ Set Fixtures &amp; Start Tournament</button>
     </div>`;
     return;
   }
@@ -563,12 +563,11 @@ function renderPanel(){
 function viewRound(g,ri){S[g].cur=ri;renderPanel();}
 
 // ── BRACKET LOGIC ──
-function shuffle(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 function buildR1(teams){
-  const sh=shuffle(teams);const ms=[];
-  for(let i=0;i<sh.length;i+=2){
-    if(i+1<sh.length) ms.push({t1:sh[i],t2:sh[i+1],winner:null,s1:0,s2:0,bye:false});
-    else ms.push({t1:sh[i],t2:null,winner:sh[i],s1:null,s2:null,bye:true});
+  const ms=[];
+  for(let i=0;i<teams.length;i+=2){
+    if(i+1<teams.length) ms.push({t1:teams[i],t2:teams[i+1],winner:null,s1:0,s2:0,bye:false});
+    else ms.push({t1:teams[i],t2:null,winner:teams[i],s1:null,s2:null,bye:true});
   }
   return{matches:ms};
 }
@@ -576,14 +575,14 @@ function getRLabel(ri,total){const r=total-ri;if(r===1)return'Final';if(r===2)re
 
 function showDraw(g){
   pDraw=g;const n=S[g].teams.length;
-  document.getElementById('od-title').textContent=`Draw ${g==='boys'?'Boys':'Girls'} Fixtures`;
-  document.getElementById('od-sub').textContent=`${n} teams will be randomly paired into Round 1.`;
+  document.getElementById('od-title').textContent=`Set ${g==='boys'?'Boys':'Girls'} Fixtures`;
+  document.getElementById('od-sub').textContent=`${n} teams will be paired into Round 1 in registration order.`;
   document.getElementById('od-warn').style.display=S[g].started?'block':'none';
   openOv('ov-draw');
 }
 function confirmDraw(){
   const g=pDraw;S[g].bracket=[buildR1(S[g].teams)];S[g].cur=0;S[g].started=true;
-  closeOv('ov-draw');saveS();renderAdmin();toast(`🎲 ${g} fixtures drawn!`);
+  closeOv('ov-draw');saveS();renderAdmin();toast(`✓ ${g} fixtures set!`);
 }
 function resetT(g){
   if(!confirm(`Reset ${g} tournament? Teams stay, bracket is cleared.`))return;
