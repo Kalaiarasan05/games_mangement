@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tournament Bracket</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0f14;
+    --surface: #161920;
+    --surface2: #1e2330;
+    --border: #2a2f3d;
+    --accent: #f0b429;
+    --accent2: #38b2ac;
+    --win: #22c55e;
+    --loss: #ef4444;
+    --text: #e8eaf0;
+    --muted: #636b82;
+    --card-w: 172px;
+    --card-h: 52px;
+    --gap: 16px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    font-family: 'DM Sans', sans-serif;
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: auto;
+  }
+
+  /* noise overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.4;
+  }
+
+  header {
+    position: relative;
+    z-index: 10;
+    padding: 28px 40px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    background: linear-gradient(180deg, #13161f 0%, transparent 100%);
+  }
+
+  .trophy-icon {
+    font-size: 40px;
+    filter: drop-shadow(0 0 12px #f0b42988);
+  }
+
+  header h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 42px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  header p {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 1px;
+    margin-top: 4px;
+  }
+
+  .header-right {
+    margin-left: auto;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    padding: 8px 18px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    cursor: pointer;
+    transition: all .15s;
+    text-transform: uppercase;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-accent { background: var(--accent); color: #0d0f14; border-color: var(--accent); font-weight: 600; }
+  .btn-accent:hover { background: #e0a820; color: #0d0f14; }
+
+  .hint-bar {
+    position: relative;
+    z-index: 10;
+    padding: 10px 40px;
+    background: rgba(240,180,41,.08);
+    border-bottom: 1px solid rgba(240,180,41,.15);
+    font-size: 12px;
+    color: var(--accent);
+    font-family: 'DM Mono', monospace;
+    letter-spacing: .5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .bracket-scroll {
+    position: relative;
+    z-index: 5;
+    overflow-x: auto;
+    overflow-y: auto;
+    padding: 36px 40px 60px;
+  }
+
+  .bracket {
+    display: flex;
+    gap: 0;
+    align-items: flex-start;
+    width: max-content;
+  }
+
+  /* Each round column */
+  .round-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .round-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 5px 14px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    margin-bottom: 20px;
+    white-space: nowrap;
+    background: var(--surface);
+  }
+
+  .round-matches {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Match pair */
+  .match-pair {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  /* The connector SVG sits between columns */
+  .connector-col {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    width: 40px;
+    position: relative;
+  }
+
+  /* Team card */
+  .team-card {
+    width: var(--card-w);
+    height: var(--card-h);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    transition: all .18s;
+    position: relative;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  .team-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--border);
+    transition: background .18s;
+  }
+
+  .team-card:hover:not(.tbd):not(.eliminated) {
+    border-color: var(--accent);
+    background: var(--surface2);
+    transform: translateX(2px);
+    box-shadow: 0 0 16px rgba(240,180,41,.12);
+  }
+  .team-card:hover:not(.tbd):not(.eliminated)::before {
+    background: var(--accent);
+  }
+
+  .team-card.winner {
+    border-color: var(--win);
+    background: rgba(34,197,94,.07);
+  }
+  .team-card.winner::before { background: var(--win); }
+
+  .team-card.eliminated {
+    opacity: 0.32;
+    cursor: default;
+  }
+
+  .team-card.tbd {
+    cursor: default;
+    border-style: dashed;
+    border-color: var(--border);
+    background: transparent;
+  }
+  .team-card.tbd::before { display: none; }
+
+  .card-inner {
+    padding: 0 10px 0 12px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .card-team {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+  }
+  .team-card.tbd .card-team { color: var(--muted); font-style: italic; font-weight: 400; }
+
+  .card-captain {
+    font-size: 10px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+  }
+
+  .card-win-icon {
+    font-size: 13px;
+    margin-right: 8px;
+    opacity: 0;
+    transition: opacity .15s;
+  }
+  .team-card.winner .card-win-icon { opacity: 1; }
+
+  /* Divider between the two team cards in a match */
+  .match-divider {
+    height: 4px;
+    background: var(--bg);
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    width: var(--card-w);
+  }
+
+  /* Spacing between matches */
+  .match-spacer { flex: 1; }
+
+  /* Champion box */
+  .champion-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0 20px;
+  }
+
+  .champion-box {
+    width: 160px;
+    padding: 20px 16px;
+    background: linear-gradient(135deg, #1a1500, #2a2000);
+    border: 1px solid var(--accent);
+    border-radius: 12px;
+    text-align: center;
+    box-shadow: 0 0 40px rgba(240,180,41,.15);
+  }
+  .champion-box .trophy { font-size: 36px; display: block; margin-bottom: 8px; filter: drop-shadow(0 0 8px #f0b42988); }
+  .champion-box .champ-label { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 2px; color: var(--accent); text-transform: uppercase; margin-bottom: 8px; }
+  .champion-box .champ-team { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 2px; color: var(--text); line-height: 1.1; }
+  .champion-box .champ-captain { font-size: 11px; color: var(--muted); margin-top: 4px; font-family: 'DM Mono', monospace; }
+
+  /* SVG connectors */
+  .conn-svg { overflow: visible; display: block; }
+
+  /* Round 1 bye section */
+  .bye-section {
+    position: relative;
+    z-index: 10;
+    padding: 10px 40px 0;
+  }
+  .bye-toggle {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--accent2);
+    cursor: pointer;
+    letter-spacing: 1px;
+    border: none;
+    background: none;
+    padding: 0;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .bye-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+    max-width: 1000px;
+  }
+  .bye-chip {
+    font-size: 11px;
+    padding: 3px 10px;
+    background: rgba(56,178,172,.08);
+    border: 1px solid rgba(56,178,172,.25);
+    border-radius: 20px;
+    color: var(--accent2);
+    font-family: 'DM Mono', monospace;
+  }
+  .bye-chips.hidden { display: none; }
+
+  /* Progress bar */
+  .progress-bar {
+    position: relative;
+    z-index: 10;
+    padding: 12px 40px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .progress-label { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; }
+  .progress-track { flex: 1; max-width: 300px; height: 4px; background: var(--border); border-radius: 2px; }
+  .progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width .4s; }
+  .progress-count { font-size: 11px; color: var(--accent); font-family: 'DM Mono', monospace; }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="trophy-icon">🏆</span>
+  <div>
+    <h1>Tournament Bracket</h1>
+    <p>21 TEAMS · SINGLE ELIMINATION · CLICK A TEAM TO ADVANCE</p>
+  </div>
+  <div class="header-right">
+    <button class="btn" onclick="resetBracket()">↺ Reset</button>
+    <button class="btn btn-accent" onclick="shuffleBracket()">⇌ Re-draw</button>
+  </div>
+</header>
+
+<div class="hint-bar">
+  <span>▶</span>
+  <span>Click on a team card to select them as the match winner and advance them to the next round</span>
+</div>
+
+<div class="progress-bar">
+  <span class="progress-label">PROGRESS</span>
+  <div class="progress-track"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+  <span class="progress-count" id="prog-text">0 / 20 matches decided</span>
+</div>
+
+<div class="bye-section">
+  <button class="bye-toggle" onclick="toggleByes()">▼ Show Round 1 Byes (11 teams auto-advancing)</button>
+  <div class="bye-chips hidden" id="bye-chips"></div>
+</div>
+
+<div class="bracket-scroll">
+  <div class="bracket" id="bracket"></div>
+</div>
+
+<script>
+const TEAMS = [
+  {name:"Team Elite",      captain:"Pradeep D"},
+  {name:"Logic Legends",   captain:"Daush"},
+  {name:"Team Apex",       captain:"Z A Abubakar"},
+  {name:"RRR",             captain:"Rohith Desai"},
+  {name:"Beast",           captain:"B P Prajwal"},
+  {name:"Bestie Sparks",   captain:"Thanusha"},
+  {name:"Logic Legend ls", captain:"Nischay"},
+  {name:"Logic Legend",    captain:"Mohith D"},
+  {name:"Comebuster",      captain:"Kennith"},
+  {name:"A Sec",           captain:"Aseem S"},
+  {name:"Royal Challengers 1", captain:"Praveen Raj"},
+  {name:"Royal Challengers 2", captain:"Pranav"},
+  {name:"Royal Challengers 3", captain:"Jai Vignesh"},
+  {name:"Royal Challengers 4", captain:"Ganesh HV"},
+  {name:"Preetham P",      captain:"Preetham P"},
+  {name:"Anil",            captain:"M Anil Kumar"},
+  {name:"Venkatesh B",     captain:"Venkatesh B"},
+  {name:"Anju Shree",      captain:"S.Anju Shree"},
+  {name:"Yashwanth P",     captain:"Yashwanth P"},
+  {name:"Prithvi Raj D",   captain:"Prithvi Raj D"},
+  {name:"Sumanth S",       captain:"Sumanth S"},
+];
+
+// State
+let bracket = {}; // matchId -> {t1, t2, winner}
+let seed = Date.now();
+
+function seededShuffle(arr, s) {
+  const a = [...arr];
+  let x = s;
+  const rnd = () => { x = (x * 1664525 + 1013904223) & 0xffffffff; return (x >>> 0) / 4294967296; };
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function shuffleBracket() { seed = Date.now(); initBracket(); }
+function resetBracket() { initBracket(); }
+
+function initBracket() {
+  bracket = {};
+  const shuffled = seededShuffle(TEAMS, seed);
+  const byes = shuffled.slice(0, 11);
+  const r1teams = shuffled.slice(11);
+
+  // Build match structure
+  // R1: 5 matches
+  for (let i = 0; i < 5; i++) {
+    bracket[`r1_${i}`] = { t1: r1teams[i*2], t2: r1teams[i*2+1], winner: null };
+  }
+
+  // R16 pool: 11 byes + 5 R1 winners
+  // We'll represent R16 with placeholders for R1 winners
+  const r16pool = seededShuffle([
+    ...byes.map(t => ({...t, bye:true})),
+    ...Array(5).fill(null).map((_,i) => ({name:`Winner R1-M${i+1}`, captain:'TBD', tbd:true, r1ref:i}))
+  ], seed + 1);
+
+  for (let i = 0; i < 8; i++) {
+    bracket[`r16_${i}`] = { t1: r16pool[i*2], t2: r16pool[i*2+1], winner: null };
+  }
+
+  for (let i = 0; i < 4; i++) {
+    bracket[`qf_${i}`] = { t1: null, t2: null, winner: null };
+  }
+  for (let i = 0; i < 2; i++) {
+    bracket[`sf_${i}`] = { t1: null, t2: null, winner: null };
+  }
+  bracket[`final`] = { t1: null, t2: null, winner: null };
+
+  renderByes(byes);
+  renderBracket();
+  updateProgress();
+}
+
+function renderByes(byes) {
+  const c = document.getElementById('bye-chips');
+  c.innerHTML = byes.map(t => `<span class="bye-chip">${t.name} · ${t.captain}</span>`).join('');
+}
+
+function toggleByes() {
+  const c = document.getElementById('bye-chips');
+  const btn = document.querySelector('.bye-toggle');
+  c.classList.toggle('hidden');
+  btn.textContent = c.classList.contains('hidden')
+    ? '▼ Show Round 1 Byes (11 teams auto-advancing)'
+    : '▲ Hide Round 1 Byes';
+}
+
+function getTeamForSlot(slot) {
+  if (!slot) return null;
+  if (slot.tbd) {
+    // resolve from r1
+    const r1m = bracket[`r1_${slot.r1ref}`];
+    return r1m ? r1m.winner : null;
+  }
+  return slot;
+}
+
+function resolveTeam(t) {
+  if (!t) return null;
+  if (t.tbd && t.r1ref !== undefined) {
+    const r1m = bracket[`r1_${t.r1ref}`];
+    return r1m ? r1m.winner : null;
+  }
+  return t;
+}
+
+// After picking winner in a round, propagate forward
+function propagate() {
+  // QF gets winners of R16 pairs
+  for (let i = 0; i < 4; i++) {
+    const m1 = bracket[`r16_${i*2}`];
+    const m2 = bracket[`r16_${i*2+1}`];
+    bracket[`qf_${i}`].t1 = m1.winner || null;
+    bracket[`qf_${i}`].t2 = m2.winner || null;
+    if (!m1.winner || !m2.winner) { bracket[`qf_${i}`].winner = null; }
+  }
+  // SF
+  for (let i = 0; i < 2; i++) {
+    bracket[`sf_${i}`].t1 = bracket[`qf_${i*2}`].winner || null;
+    bracket[`sf_${i}`].t2 = bracket[`qf_${i*2+1}`].winner || null;
+    if (!bracket[`qf_${i*2}`].winner || !bracket[`qf_${i*2+1}`].winner) bracket[`sf_${i}`].winner = null;
+  }
+  // Final
+  bracket.final.t1 = bracket.sf_0.winner || null;
+  bracket.final.t2 = bracket.sf_1.winner || null;
+  if (!bracket.sf_0.winner || !bracket.sf_1.winner) bracket.final.winner = null;
+}
+
+function pickWinner(matchId, teamSide) {
+  const match = bracket[matchId];
+  const resolved1 = matchId.startsWith('r16') ? getTeamForSlot(match.t1) : match.t1;
+  const resolved2 = matchId.startsWith('r16') ? getTeamForSlot(match.t2) : match.t2;
+
+  const t1 = resolved1 || (matchId.startsWith('r16') ? match.t1 : match.t1);
+  const t2 = resolved2 || (matchId.startsWith('r16') ? match.t2 : match.t2);
+
+  if (teamSide === 1 && t1 && !t1.tbd) {
+    match.winner = t1;
+  } else if (teamSide === 2 && t2 && !t2.tbd) {
+    match.winner = t2;
+  }
+  propagate();
+  renderBracket();
+  updateProgress();
+}
+
+function updateProgress() {
+  let decided = 0, total = 20;
+  const ids = ['r1_0','r1_1','r1_2','r1_3','r1_4','r16_0','r16_1','r16_2','r16_3','r16_4','r16_5','r16_6','r16_7','qf_0','qf_1','qf_2','qf_3','sf_0','sf_1','final'];
+  ids.forEach(id => { if (bracket[id] && bracket[id].winner) decided++; });
+  const pct = (decided / total * 100).toFixed(0);
+  document.getElementById('prog-fill').style.width = pct + '%';
+  document.getElementById('prog-text').textContent = `${decided} / ${total} matches decided`;
+}
+
+// Card height and gap constants for layout
+const CARD_H = 52;
+const CARD_GAP = 4; // gap between two cards in a match (divider)
+const MATCH_H = CARD_H * 2 + CARD_GAP;
+
+function makeCard(team, matchId, side, isWinner, isEliminated) {
+  const tbd = !team || team.tbd;
+  const classes = ['team-card', tbd ? 'tbd' : '', isWinner ? 'winner' : '', isEliminated ? 'eliminated' : ''].filter(Boolean).join(' ');
+  const display = tbd ? (team ? team.name : 'TBD') : team.name;
+  const captain = tbd ? '' : team.captain;
+  const onclick = tbd || isEliminated ? '' : `onclick="pickWinner('${matchId}', ${side})"`;
+  return `<div class="${classes}" ${onclick} title="${tbd ? '' : `Click to advance ${team.name}`}">
+    <div class="card-inner">
+      <div class="card-team">${display}</div>
+      ${!tbd ? `<div class="card-captain">${captain}</div>` : ''}
+    </div>
+    <span class="card-win-icon">✓</span>
+  </div>`;
+}
+
+function makeMatch(matchId, vSpaceBefore, vSpaceAfter) {
+  const match = bracket[matchId];
+  if (!match) return '';
+
+  let t1 = match.t1, t2 = match.t2;
+  if (matchId.startsWith('r16')) {
+    t1 = getTeamForSlot(match.t1) || match.t1;
+    t2 = getTeamForSlot(match.t2) || match.t2;
+  }
+
+  const w = match.winner;
+  const t1Win = w && t1 && w.name === t1.name;
+  const t2Win = w && t2 && w.name === t2.name;
+  const t1Elim = w && !t1Win;
+  const t2Elim = w && !t2Win;
+
+  return `
+    <div class="match-pair" style="margin-top:${vSpaceBefore}px; margin-bottom:${vSpaceAfter}px;">
+      ${makeCard(t1, matchId, 1, t1Win, t1Elim)}
+      <div class="match-divider"></div>
+      ${makeCard(t2, matchId, 2, t2Win, t2Elim)}
+    </div>`;
+}
+
+function renderBracket() {
+  const el = document.getElementById('bracket');
+
+  // Calculate spacing: R16 has 8 matches. Total height = 8 * MATCH_H + 7 * gap_between_matches
+  // We want each round's cards to be vertically centered with their R16 equivalents
+  const R16_BETWEEN = 24; // gap between R16 matches
+  const r16MatchH = MATCH_H + R16_BETWEEN;
+  const totalH = 8 * MATCH_H + 7 * R16_BETWEEN;
+
+  // Spacing for each round
+  // QF: 4 matches spread over 2 R16-pairs each. Each QF match spans 2 R16 matches.
+  const r1Between = 0;
+  const qfBetween = R16_BETWEEN * 2 + MATCH_H + R16_BETWEEN;
+  const sfBetween = qfBetween * 2 + MATCH_H;
+
+  let html = '';
+
+  // --- ROUND 1 ---
+  // 5 R1 matches; they feed into specific R16 slots
+  // Find which R16 indices have tbd entries
+  let r16tbd = [];
+  for (let i = 0; i < 8; i++) {
+    const m = bracket[`r16_${i}`];
+    if ((m.t1 && m.t1.tbd) || (m.t2 && m.t2.tbd)) r16tbd.push(i);
+  }
+
+  // Build R1 column HTML: position each R1 match at the y of its corresponding R16 slot
+  html += `<div class="round-col">
+    <div class="round-label">ROUND 1</div>
+    <div style="position:relative; height:${totalH}px; width:${172}px;">`;
+
+  for (let i = 0; i < 5; i++) {
+    const r16idx = r16tbd[i];
+    const r16Top = r16idx * (MATCH_H + R16_BETWEEN);
+    // Which card in R16 is tbd
+    const m16 = bracket[`r16_${r16idx}`];
+    const tbdIsT1 = m16.t1 && m16.t1.tbd;
+    const cardTop = tbdIsT1 ? r16Top : r16Top + CARD_H + CARD_GAP;
+    const r1Top = cardTop - CARD_H / 2; // center R1 match around the tbd card center
+    const clampedTop = Math.max(0, Math.min(r1Top, totalH - MATCH_H));
+
+    const match = bracket[`r1_${i}`];
+    const w = match.winner;
+    const t1Win = w && match.t1 && w.name === match.t1.name;
+    const t2Win = w && match.t2 && w.name === match.t2.name;
+
+    html += `<div style="position:absolute; top:${clampedTop}px; left:0;">
+      ${makeCard(match.t1, `r1_${i}`, 1, t1Win, w && !t1Win)}
+      <div class="match-divider"></div>
+      ${makeCard(match.t2, `r1_${i}`, 2, t2Win, w && !t2Win)}
+    </div>`;
+  }
+  html += `</div></div>`;
+
+  // Connector R1→R16
+  html += `<div style="width:40px; height:${totalH + 36}px; position:relative; margin-top:36px;">
+    <svg width="40" height="${totalH}" class="conn-svg">`;
+  for (let i = 0; i < 5; i++) {
+    const r16idx = r16tbd[i];
+    const r16Top = r16idx * (MATCH_H + R16_BETWEEN);
+    const m16 = bracket[`r16_${r16idx}`];
+    const tbdIsT1 = m16.t1 && m16.t1.tbd;
+    const cardCenter = tbdIsT1 ? r16Top + CARD_H/2 : r16Top + CARD_H + CARD_GAP + CARD_H/2;
+    const r1Top = Math.max(0, Math.min(cardCenter - CARD_H/2 - CARD_H/2, totalH - MATCH_H));
+    const r1t1c = r1Top + CARD_H/2;
+    const r1t2c = r1Top + CARD_H + CARD_GAP + CARD_H/2;
+    const midY = (r1t1c + r1t2c) / 2;
+    html += `<line x1="0" y1="${r1t1c}" x2="20" y2="${r1t1c}" stroke="#2a2f3d" stroke-width="1.5"/>
+             <line x1="0" y1="${r1t2c}" x2="20" y2="${r1t2c}" stroke="#2a2f3d" stroke-width="1.5"/>
+             <line x1="20" y1="${r1t1c}" x2="20" y2="${r1t2c}" stroke="#2a2f3d" stroke-width="1.5"/>
+             <line x1="20" y1="${midY}" x2="40" y2="${cardCenter}" stroke="#2a2f3d" stroke-width="1.5"/>`;
+  }
+  html += `</svg></div>`;
+
+  // --- ROUND OF 16 ---
+  html += `<div class="round-col">
+    <div class="round-label">ROUND OF 16</div>
+    <div class="round-matches">`;
+  for (let i = 0; i < 8; i++) {
+    if (i > 0) html += `<div style="height:${R16_BETWEEN}px"></div>`;
+    html += makeMatch(`r16_${i}`, 0, 0);
+  }
+  html += `</div></div>`;
+
+  // Connector R16→QF
+  const qfMatchH = MATCH_H;
+  html += buildConnector(8, 4, totalH, R16_BETWEEN);
+
+  // --- QUARTER-FINALS ---
+  const qfSpacing = MATCH_H + R16_BETWEEN * 2 + R16_BETWEEN;
+  html += `<div class="round-col">
+    <div class="round-label">QUARTER-FINALS</div>
+    <div class="round-matches">`;
+  for (let i = 0; i < 4; i++) {
+    if (i > 0) html += `<div style="height:${qfSpacing}px"></div>`;
+    html += makeMatch(`qf_${i}`, 0, 0);
+  }
+  html += `</div></div>`;
+
+  // Connector QF→SF
+  const sfSpacingVal = qfSpacing * 2 + MATCH_H + qfSpacing/2;
+  html += buildConnector(4, 2, totalH, qfSpacing + MATCH_H/2, true);
+
+  // --- SEMI-FINALS ---
+  const sfSpacing = (totalH - 2 * MATCH_H) - (MATCH_H + qfSpacing * 2);
+  const sfGap = totalH - 2*MATCH_H;
+  html += `<div class="round-col">
+    <div class="round-label">SEMI-FINALS</div>
+    <div class="round-matches">`;
+  const sfTop0 = (2 * (MATCH_H + qfSpacing)) - MATCH_H/2 - CARD_H/2;
+  html += `<div style="height:${sfTop0 > 0 ? sfTop0 : 0}px"></div>`;
+  html += makeMatch('sf_0', 0, 0);
+  const sfGapBetween = totalH - 2*MATCH_H - (sfTop0 > 0 ? sfTop0 : 0);
+  html += `<div style="height:${Math.max(sfGapBetween, qfSpacing)}px"></div>`;
+  html += makeMatch('sf_1', 0, 0);
+  html += `</div></div>`;
+
+  // Connector SF→F
+  html += buildConnector(2, 1, totalH, sfGapBetween > 0 ? sfGapBetween : qfSpacing*2, true);
+
+  // --- FINAL ---
+  html += `<div class="round-col">
+    <div class="round-label">FINAL</div>
+    <div style="display:flex; align-items:center; height:${totalH}px;">
+      <div>`;
+  html += makeMatch('final', 0, 0);
+  html += `</div></div></div>`;
+
+  // Connector Final→Champion
+  html += `<div style="width:40px; height:${totalH + 36}px; position:relative; margin-top:36px;">
+    <svg width="40" height="${totalH}" class="conn-svg">
+      <line x1="0" y1="${totalH/2}" x2="40" y2="${totalH/2}" stroke="${bracket.final.winner ? '#f0b429' : '#2a2f3d'}" stroke-width="2"/>
+    </svg>
+  </div>`;
+
+  // --- CHAMPION ---
+  const champ = bracket.final ? bracket.final.winner : null;
+  html += `<div class="champion-col" style="height:${totalH + 36}px;">
+    <div class="champion-box">
+      <span class="trophy">🏆</span>
+      <div class="champ-label">Champion</div>
+      <div class="champ-team">${champ ? champ.name : '?'}</div>
+      ${champ ? `<div class="champ-captain">${champ.captain}</div>` : ''}
+    </div>
+  </div>`;
+
+  el.innerHTML = html;
+}
+
+function buildConnector(fromCount, toCount, totalH, spacing, extend=false) {
+  const ratio = fromCount / toCount;
+  const svgH = totalH;
+  let lines = '';
+  const fromMatchH = MATCH_H;
+  const toMatchH = MATCH_H;
+  const fromGap = (totalH - fromCount * fromMatchH) / (fromCount - 1 || 1);
+  const toGap   = (totalH - toCount  * toMatchH)  / (toCount - 1 || 1);
+
+  for (let ti = 0; ti < toCount; ti++) {
+    const tcy = ti * (toMatchH + toGap) + toMatchH/2;
+    for (let k = 0; k < ratio; k++) {
+      const fi = ti * ratio + k;
+      const fcy = fi * (fromMatchH + fromGap) + fromMatchH/2;
+      const mx = 20;
+      lines += `<line x1="0" y1="${fcy}" x2="${mx}" y2="${fcy}" stroke="#2a2f3d" stroke-width="1.5"/>`;
+      if (k === 0 || k === ratio-1) {
+        lines += `<line x1="${mx}" y1="${fcy}" x2="${mx}" y2="${tcy}" stroke="#2a2f3d" stroke-width="1.5"/>`;
+      }
+      lines += `<line x1="${mx}" y1="${tcy}" x2="40" y2="${tcy}" stroke="#2a2f3d" stroke-width="1.5"/>`;
+    }
+  }
+  return `<div style="width:40px; height:${svgH + 36}px; position:relative; margin-top:36px;">
+    <svg width="40" height="${svgH}" class="conn-svg">${lines}</svg>
+  </div>`;
+}
+
+initBracket();
+</script>
+</body>
+</html>
