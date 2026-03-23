@@ -253,6 +253,9 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;color:var(--text);backgro
 .rest .rtc{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;}
 .rest.rw .rtn{color:var(--win);}
 .resscore{font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--gold);min-width:56px;text-align:center;flex-shrink:0;}
+.mb-team{background:var(--s3);border:1px solid var(--border);border-radius:8px;padding:10px;cursor:pointer;transition:all .15s;font-size:11px;font-weight:500;}
+.mb-team:hover{border-color:var(--gold);background:rgba(240,180,41,.05);}
+.mb-team.selected{background:rgba(240,180,41,.2);border-color:var(--gold);}
 </style>
 </head>
 <body>
@@ -404,6 +407,20 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;color:var(--text);backgro
   </div>
 </div>
 
+<div class="overlay" id="ov-matchups" onclick="if(event.target===this)closeOv('ov-matchups')">
+  <div class="modal" style="max-width:500px;max-height:80vh;">
+    <h3 id="mb-title">Create Matchups</h3>
+    <div class="modal-sub">Click two teams to create a matchup</div>
+    <div style="background:var(--s3);border:1px solid var(--border);border-radius:9px;padding:12px;margin-bottom:14px;max-height:200px;overflow-y:auto;display:grid;gap:6px;" id="mb-available"></div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:10px;">📌 <span id="mb-selected">0 selected</span></div>
+    <div style="background:var(--s2);border:1px solid var(--border);border-radius:9px;padding:12px;margin-bottom:14px;max-height:200px;overflow-y:auto;" id="mb-matchups"></div>
+    <div class="modal-btns">
+      <button class="btn" onclick="closeOv('ov-matchups')">Cancel</button>
+      <button class="btn btn-gold" onclick="confirmMatchups()">Start Tournament ▶</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -456,7 +473,7 @@ function renderAside(){
   <div class="sec-title">${T.length} Team${T.length!==1?'s':''} Registered</div>`;
   if(!T.length)h+=`<div class="empty-t">No teams yet.<br>Add the first team above.</div>`;
   else T.forEach((t,i)=>{
-    h+=`<div class="tcard"><div class="tnum">${i+1}</div><div class="tinfo"><div class="tn">${esc(t.name)}</div><div class="tc">${esc(t.captain)}</div></div>${!S[g].started?`<button class="tdel" onclick="rmTeam('${g}',${i})">×</button>`:''}</div>`;
+    h+=`<div class="tcard"><div class="tnum">${i+1}</div><div class="tinfo"><div class="tn">${esc(t.name)}</div><div class="tc">${esc(t.captain)}</div></div><button class="tdel" onclick="rmTeam('${g}',${i})">×</button></div>`;
   });
   document.getElementById('aside-body').innerHTML=h;
 }
@@ -465,13 +482,11 @@ function addTeam(g){
   const name=ni.value.trim(),cap=ci.value.trim();
   if(!name){ni.classList.add('err');setTimeout(()=>ni.classList.remove('err'),350);toast('⚠ Enter team name');return;}
   if(!cap){ci.classList.add('err');setTimeout(()=>ci.classList.remove('err'),350);toast('⚠ Enter captain name');return;}
-  if(S[g].started){toast('⚠ Tournament already started');return;}
   S[g].teams.push({name,captain:cap});
   ni.value='';ci.value='';
   saveS();renderAdmin();toast(`✓ ${name} added`);
 }
 function rmTeam(g,i){
-  if(S[g].started){toast('⚠ Cannot remove after start');return;}
   if(!confirm(`Remove "${S[g].teams[i].name}"?`))return;
   S[g].teams.splice(i,1);saveS();renderAdmin();toast('🗑 Removed');
 }
@@ -495,9 +510,9 @@ function renderPanel(){
     el.innerHTML=`<div class="scard">
       <h3 style="color:${col};">${g==='boys'?'⚽ Boys':'🏐 Girls'} Tournament</h3>
       <div style="background:var(--s2);border:1px solid var(--border);border-radius:9px;padding:16px;margin-bottom:14px;font-size:13px;color:var(--muted2);line-height:1.6;">
-        ${n===0?'No teams yet. Add teams from the left sidebar first.':n===1?'Need at least 2 teams to start.':`<span style="color:${col};font-weight:600;">${n} teams</span> registered. Ready to draw fixtures randomly.${n%2===1?'<br><span style="color:var(--gold);">Odd number — 1 team gets a bye.</span>':''}`}
+        ${n===0?'No teams yet. Add teams from the left sidebar first.':n===1?'Need at least 2 teams to start.':`<span style="color:${col};font-weight:600;">${n} teams</span> registered. Manually create matchups below.`}
       </div>
-      <button class="btn btn-gold" style="width:100%;justify-content:center;padding:12px;" ${ok?'':'disabled'} onclick="showDraw('${g}')">→ Set Fixtures &amp; Start Tournament</button>
+      <button class="btn btn-gold" style="width:100%;justify-content:center;padding:12px;" ${ok?'':'disabled'} onclick="showMatchupBuilder('${g}')">⚔ Create Matchups & Start</button>
     </div>`;
     return;
   }
@@ -563,15 +578,77 @@ function renderPanel(){
 function viewRound(g,ri){S[g].cur=ri;renderPanel();}
 
 // ── BRACKET LOGIC ──
-function buildR1(teams){
-  const ms=[];
-  for(let i=0;i<teams.length;i+=2){
-    if(i+1<teams.length) ms.push({t1:teams[i],t2:teams[i+1],winner:null,s1:0,s2:0,bye:false});
-    else ms.push({t1:teams[i],t2:null,winner:teams[i],s1:null,s2:null,bye:true});
-  }
-  return{matches:ms};
+function buildR1(matches){
+  return {matches};
 }
 function getRLabel(ri,total){const r=total-ri;if(r===1)return'Final';if(r===2)return'Semi-Finals';if(r===3)return'Quarter-Finals';return`Round ${ri+1}`;}
+
+let mbGender=null,mbMatches=[];
+function showMatchupBuilder(g){
+  mbGender=g;
+  mbMatches=[];
+  const teams=S[g].teams;
+  document.getElementById('mb-title').textContent=`Create ${g==='boys'?'Boys':'Girls'} Matchups`;
+  document.getElementById('mb-available').innerHTML=teams.map((t,i)=>
+    `<div class="mb-team" data-idx="${i}" onclick="toggleTeamSelect(${i})">${esc(t.name)}<div style="font-size:9px;color:var(--muted);">Captain: ${esc(t.captain)}</div></div>`
+  ).join('');
+  document.getElementById('mb-matchups').innerHTML='<div style="color:var(--muted);font-size:11px;">Select two teams to create a matchup</div>';
+  document.getElementById('mb-selected').textContent=`0 selected`;
+  selectedTeams=[];
+  openOv('ov-matchups');
+}
+
+let selectedTeams=[];
+function toggleTeamSelect(idx){
+  const teams=S[mbGender].teams;
+  const elem=document.querySelector(`[data-idx="${idx}"]`);
+  
+  if(selectedTeams.includes(idx)){
+    selectedTeams=selectedTeams.filter(i=>i!==idx);
+    elem.style.background='';
+  }else{
+    selectedTeams.push(idx);
+    elem.style.background='rgba(240,180,41,.2)';
+    
+    if(selectedTeams.length===2){
+      const [i1,i2]=selectedTeams;
+      mbMatches.push({t1:teams[i1],t2:teams[i2],winner:null,s1:0,s2:0,bye:false});
+      renderMbMatchups();
+      document.querySelectorAll('.mb-team').forEach(e=>e.style.background='');
+      selectedTeams=[];
+    }
+  }
+  document.getElementById('mb-selected').textContent=`${selectedTeams.length} selected`;
+}
+
+function renderMbMatchups(){
+  const html=mbMatches.map((m,i)=>
+    `<div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:11px;font-weight:600;">${esc(m.t1.name)} vs ${esc(m.t2.name)}</div>
+        <div style="font-size:9px;color:var(--muted);">Captain: ${esc(m.t1.captain)} vs ${esc(m.t2.captain)}</div>
+      </div>
+      <button class="btn btn-sm btn-danger" onclick="removeMbMatch(${i})">×</button>
+    </div>`
+  ).join('');
+  document.getElementById('mb-matchups').innerHTML=html||'<div style="color:var(--muted);font-size:11px;">No matchups created</div>';
+}
+
+function removeMbMatch(idx){
+  mbMatches.splice(idx,1);
+  renderMbMatchups();
+}
+
+function confirmMatchups(){
+  if(mbMatches.length<1){toast('⚠ Create at least 1 matchup');return;}
+  S[mbGender].bracket=[buildR1(mbMatches)];
+  S[mbGender].cur=0;
+  S[mbGender].started=true;
+  closeOv('ov-matchups');
+  saveS();
+  renderAdmin();
+  toast(`✓ ${mbGender} tournament started with ${mbMatches.length} match${mbMatches.length!==1?'es':''}!`);
+}
 
 function showDraw(g){
   pDraw=g;const n=S[g].teams.length;
