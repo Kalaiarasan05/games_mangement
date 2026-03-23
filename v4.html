@@ -581,6 +581,15 @@ function viewRound(g,ri){S[g].cur=ri;renderPanel();}
 function buildR1(matches){
   return {matches};
 }
+function buildNextRound(winners){
+  // Pair winners from previous round into new matches
+  const ms=[];
+  for(let i=0;i<winners.length;i+=2){
+    if(i+1<winners.length) ms.push({t1:winners[i],t2:winners[i+1],winner:null,s1:0,s2:0,bye:false});
+    else ms.push({t1:winners[i],t2:null,winner:winners[i],s1:null,s2:null,bye:true});
+  }
+  return {matches:ms};
+}
 function getRLabel(ri,total){const r=total-ri;if(r===1)return'Final';if(r===2)return'Semi-Finals';if(r===3)return'Quarter-Finals';return`Round ${ri+1}`;}
 
 let mbGender=null,mbMatches=[];
@@ -700,8 +709,8 @@ function confirmUnsel(){
 function advRound(g){
   const ts=S[g],cr=ts.cur;
   const winners=ts.bracket[cr].matches.map(m=>m.winner).filter(Boolean);
-  if(winners.length<2){toast('Need at least 2 winners');return;}
-  ts.bracket.push(buildR1(winners));ts.cur=ts.bracket.length-1;
+  if(winners.length<1){toast('⚠ Need at least 1 winner to advance');return;}
+  ts.bracket.push(buildNextRound(winners));ts.cur=ts.bracket.length-1;
   saveS();renderAdmin();toast(`▶ Round ${ts.bracket.length} generated!`);
 }
 
